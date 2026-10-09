@@ -11,7 +11,7 @@
       "step": "installTheme",
       "themeData": {
         "resource": "wordpress.org/themes",
-        "slug": "purple"
+        "slug": "storefront"
       },
       "options": {
         "activate": true
