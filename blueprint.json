@@ -1,0 +1,45 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "landingPage": "/shop/",
+  "login": true,
+  "preferredVersions": {
+    "php": "8.2",
+    "wp": "latest"
+  },
+  "steps": [
+    {
+      "step": "installTheme",
+      "themeData": {
+        "resource": "wordpress.org/themes",
+        "slug": "purple"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "coupons-plus-for-woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/media.php'; require_once ABSPATH . 'wp-admin/includes/file.php'; require_once ABSPATH . 'wp-admin/includes/image.php'; delete_transient('_wc_activation_redirect'); update_option('woocommerce_coming_soon', 'no'); update_option('woocommerce_store_pages_only', 'no'); update_option('wc_feature_woocommerce_brands_enabled', 'yes'); if (class_exists('WC_Install')) { WC_Install::create_pages(); } update_option('woocommerce_bacs_settings', array('enabled' => 'yes', 'title' => 'Direct Bank Transfer', 'description' => 'Test checkout (non-destructive).', 'instructions' => 'Test order placed successfully. No real charge.')); if (!taxonomy_exists('product_brand')) { register_taxonomy('product_brand', 'product', array('hierarchical' => true)); } function get_cat($n) { $t = wp_insert_term($n, 'product_cat'); if (is_array($t)) return $t['term_id']; $e = get_term_by('name', $n, 'product_cat'); return $e ? $e->term_id : 0; } $c_shoes = get_cat('Shoes'); $c_hoodies = get_cat('Hoodies & Sweaters'); $c_tshirts = get_cat('T-Shirts'); $c_pants = get_cat('Pants & Jeans'); function fetch_repo_img($fn, $title) { $base = 'https://raw.githubusercontent.com/neblabs/coupons-plus-dummy-demo-data/main/images/'; $alts = array_unique(array($fn, trim($fn), str_replace(' .jpg', '.jpg', $fn), str_replace('.jpg', ' .jpg', $fn))); foreach ($alts as $f) { $tmp = download_url($base . rawurlencode($f), 15); if (!is_wp_error($tmp)) { $id = media_handle_sideload(array('name' => sanitize_title($title) . '.jpg', 'tmp_name' => $tmp), 0); if (!is_wp_error($id)) return $id; } } return 0; } function add_simple($name, $sku, $brand, $cat, $price, $img_file) { $img_id = fetch_repo_img($img_file, $name); $p = new WC_Product_Simple(); $p->set_name($name); $p->set_regular_price((string)$price); $p->set_sku($sku); $p->set_status('publish'); $p->set_stock_status('instock'); if ($cat) $p->set_category_ids(array($cat)); if ($img_id) $p->set_image_id($img_id); $pid = $p->save(); wp_set_object_terms($pid, $brand, 'product_brand'); update_post_meta($pid, '_brand', $brand); return $pid; } function add_variable($name, $sku, $brand, $cat, $img_file, $attr_name, $vars) { $img_id = fetch_repo_img($img_file, $name); $vp = new WC_Product_Variable(); $vp->set_name($name); $vp->set_sku($sku); $vp->set_status('publish'); $vp->set_stock_status('instock'); if ($cat) $vp->set_category_ids(array($cat)); if ($img_id) $vp->set_image_id($img_id); $attr = new WC_Product_Attribute(); $attr->set_id(0); $attr->set_name($attr_name); $attr->set_options(array_keys($vars)); $attr->set_position(0); $attr->set_visible(true); $attr->set_variation(true); $vp->set_attributes(array($attr)); $vpid = $vp->save(); wp_set_object_terms($vpid, $brand, 'product_brand'); update_post_meta($vpid, '_brand', $brand); $attr_key = sanitize_title($attr_name); foreach ($vars as $val => $price) { $v = new WC_Product_Variation(); $v->set_parent_id($vpid); $v->set_attributes(array($attr_key => (string)$val)); $v->set_regular_price((string)$price); $v->set_price((string)$price); $v->set_sku($sku . '-' . sanitize_title($val)); $v->set_status('publish'); $v->set_stock_status('instock'); if ($img_id) $v->set_image_id($img_id); $v->save(); } $first_val = (string)array_key_first($vars); $parent = wc_get_product($vpid); if ($parent) { $parent->set_default_attributes(array($attr_key => $first_val)); $parent->save(); } WC_Product_Variable::sync($vpid); } add_simple(\"Nike Air Max 90\", \"NK-AM90\", \"Nike\", $c_shoes, 130.00, \"Nike Air Max 90.jpg\"); add_simple(\"Nike Air Jordan 1\", \"NK-JORDAN\", \"Jordan\", $c_shoes, 180.00, \"nike air jordan.jpg\"); add_simple(\"Adidas Ultraboost Light\", \"AD-BOOST\", \"Adidas\", $c_shoes, 190.00, \"Adidas Ultraboost Light .jpg\"); add_simple(\"Puma Classic Tee\", \"PU-TEE\", \"Puma\", $c_tshirts, 25.00, \"Puma Classic Tee .jpg\"); add_variable(\"Nike Club Fleece Hoodie\", \"NK-HOOD\", \"Nike\", $c_hoodies, \"Nike Club Fleece Hoodie.jpg\", \"Size\", array(\"S\" => 60.00, \"M\" => 60.00, \"L\" => 65.00, \"XL\" => 65.00)); add_variable(\"Adidas 3-Stripes Hoodie\", \"AD-HOOD\", \"Adidas\", $c_hoodies, \"Adidas 3-Stripes Hoodie.jpg\", \"Size\", array(\"S\" => 55.00, \"M\" => 55.00, \"L\" => 60.00, \"XL\" => 60.00)); add_variable(\"Under Armour Tech Tee\", \"UA-TECH\", \"Under Armour\", $c_tshirts, \"Under Armour Tech Tee.jpg\", \"Size\", array(\"M\" => 25.00, \"L\" => 25.00, \"XL\" => 30.00)); add_variable(\"Levi's 501 Original Jeans\", \"LV-501\", \"Levi's\", $c_pants, \"Levi's 501 Original Jeans.jpg\", \"Waist Size\", array(\"30\" => 79.50, \"32\" => 79.50, \"34\" => 79.50, \"36\" => 84.50)); add_variable(\"AE Low-Rise Pull-On Baggy Jean\", \"AE-JEAN\", \"American Eagle\", $c_pants, \"AE Low-Rise Pull-On Baggy Jean.jpg\", \"Size\", array(\"2\" => 59.95, \"4\" => 59.95, \"6\" => 59.95, \"8\" => 59.95));"
+    }
+  ]
+}
